@@ -35,16 +35,18 @@ func main() {
 		}
 
 		// Move left or right
+		var i int
 		if strings.ToLower(gs[1]) == "l" {
-			p = moveLeft(p, c)
+			p, i = moveLeft(p, c)
 		} else {
-			p = moveRight(p, c)
+			p, i = moveRight(p, c)
 		}
 
 		// Landed on zero?
-		if p == 0 {
-			n++
-		}
+		// if p == 0 {
+		// 	n++
+		// }
+		n += i
 	}
 	if err := s.Err(); err != nil {
 		panic(err)
@@ -54,26 +56,32 @@ func main() {
 	fmt.Printf("Count: %d\n", n)
 }
 
-func moveRight(start, count int) int {
-	n := start
+func moveRight(start, count int) (int, int) {
+	n, ps := start, 0
 	for range count {
 		n++
 		if n == 100 {
 			n = 0
 		}
+		if n == 0 {
+			ps++
+		}
 
 	}
-	return n
+	return n, ps
 }
 
-func moveLeft(start, count int) int {
-	n := start
+func moveLeft(start, count int) (int, int) {
+	n, ps := start, 0
 	for range count {
 		n--
 		if n == -1 {
 			n = 99
 		}
+		if n == 0 {
+			ps++
+		}
 
 	}
-	return n
+	return n, ps
 }
