@@ -30,15 +30,38 @@ func main() {
 
 		// Loop through the span...
 		for i := nl; i <= nr; i++ {
-			if numberOfDigits(i)%2 != 0 {
-				continue
+			nd := numberOfDigits(i)
+
+			// Try different window sizes
+		window:
+			for w := nd / 2; w > 0; w-- {
+				// Does w divide s evenly?
+				if nd%w != 0 {
+					continue
+				}
+
+				// Make it a string
+				s := strconv.Itoa(i)
+
+				// Get the first window
+				w1 := s[0:w]
+
+				// Look through the rest
+				for j := 1; j < nd/w; j++ {
+					wn := s[w*j : w*(j+1)]
+					if w1 != wn {
+						continue window
+					}
+				}
+
+				// If we get here it must be valid
+				fmt.Printf("Found invlaid id! %d\n", i)
+				ninv++
+				tinv += i
+
+				// No need to keep looking
+				break
 			}
-			if !isValidId(i) {
-				continue
-			}
-			fmt.Printf("Found invlaid id! %d\n", i)
-			ninv++
-			tinv += i
 		}
 	}
 
@@ -54,12 +77,6 @@ func numberOfDigits(x int) int {
 		n++
 	}
 	return n
-}
-
-func isValidId(n int) bool {
-	s := strconv.Itoa(n)
-	w := len(s)
-	return s[0:w/2] == s[w/2:w]
 }
 
 type InputReader struct {
