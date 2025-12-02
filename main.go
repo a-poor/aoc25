@@ -2,86 +2,111 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 )
 
-var re = regexp.MustCompile(`([LR])(\d+)`)
+var ErrDone = errors.New("done")
 
 func main() {
-	// Initialize the state
-	p, n := 50, 0
+	var ninv int // Number of invalid IDs
+	var tinv int
 
 	// Scan the input
-	s := bufio.NewScanner(os.Stdin)
-	for s.Scan() {
-		// Get the line
-		l := s.Text()
-		// fmt.Printf("LINE: %s\n", l)
-
-		// Parse it
-		gs := re.FindStringSubmatch(l)
-		if len(gs) != 3 {
-			panic(fmt.Sprintf("Error with line %q -> %+v", l, gs))
-		}
-
-		// Parse the number
-		c, err := strconv.Atoi(gs[2])
+	ir := InputReader{
+		r:    bufio.NewReader(os.Stdin),
+		done: false,
+	}
+	for !ir.done {
+		// Get the next span
+		nl, nr, err := ir.NextNum()
 		if err != nil {
 			panic(err)
 		}
 
-		// Move left or right
-		var i int
-		if strings.ToLower(gs[1]) == "l" {
-			p, i = moveLeft(p, c)
-		} else {
-			p, i = moveRight(p, c)
+		// Loop through the span...
+		for i := nl; i <= nr; i++ {
+			if numberOfDigits(i)%2 != 0 {
+				continue
+			}
+			if !isValidId(i) {
+				continue
+			}
+			fmt.Printf("Found invlaid id! %d\n", i)
+			ninv++
+			tinv += i
 		}
-
-		// Landed on zero?
-		// if p == 0 {
-		// 	n++
-		// }
-		n += i
-	}
-	if err := s.Err(); err != nil {
-		panic(err)
 	}
 
 	// Done!
-	fmt.Printf("Count: %d\n", n)
+	fmt.Printf("    n invalid: %d\n", ninv)
+	fmt.Printf("total invalid: %d\n", tinv)
 }
 
-func moveRight(start, count int) (int, int) {
-	n, ps := start, 0
-	for range count {
+func numberOfDigits(x int) int {
+	var n int
+	for x > 0 {
+		x /= 10
 		n++
-		if n == 100 {
-			n = 0
-		}
-		if n == 0 {
-			ps++
-		}
-
 	}
-	return n, ps
+	return n
 }
 
-func moveLeft(start, count int) (int, int) {
-	n, ps := start, 0
-	for range count {
-		n--
-		if n == -1 {
-			n = 99
-		}
-		if n == 0 {
-			ps++
-		}
+func isValidId(n int) bool {
+	s := strconv.Itoa(n)
+	w := len(s)
+	return s[0:w/2] == s[w/2:w]
+}
 
+type InputReader struct {
+	r    *bufio.Reader
+	done bool
+}
+
+func (ir *InputReader) Next() (string, string, error) {
+	// Get the starting point...
+	s1, err := ir.r.ReadString('-')
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get first string: %w", err)
 	}
-	return n, ps
+	s1 = strings.ReplaceAll(s1, "\n", "")
+	s1 = strings.ReplaceAll(s1, " ", "")
+	s1 = strings.ReplaceAll(s1, "-", "")
+
+	// Get the ending point...
+	s2, err := ir.r.ReadString(',')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", "", fmt.Errorf("failed to get second string: %w", err)
+	}
+	s2 = strings.ReplaceAll(s2, "\n", "")
+	s2 = strings.ReplaceAll(s2, " ", "")
+	s2 = strings.ReplaceAll(s2, ",", "")
+
+	// Done?
+	if errors.Is(err, io.EOF) {
+		ir.done = true
+	}
+
+	// Return the results
+	return s1, s2, nil
+}
+
+func (ir *InputReader) NextNum() (int, int, error) {
+	s1, s2, err := ir.Next()
+	if err != nil {
+		return 0, 0, err
+	}
+	n1, err := strconv.Atoi(s1)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to parse first num as int: %w", err)
+	}
+	n2, err := strconv.Atoi(s2)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to parse second num as int: %w", err)
+	}
+	return n1, n2, nil
 }
