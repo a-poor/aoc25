@@ -52,31 +52,68 @@ func main() {
 	// in and out of bounds
 	h, w := len(grid), len(grid[0])
 
-	for i, row := range grid {
-		for j, cell := range row {
-			// If it isn't toilet paper, skip it
-			if !cell {
-				continue
-			}
+	// Track which rows need to be revisited
+	dc := newdc(h)
+	dc.setall(true) // start with all dirty
 
-			// Otherwise, get it's neighbors
-			p := point{x: j, y: i}
-			ns := neighbors(p, w, h)
+	// Loop until there are no dirty rows left
+	for dc.hasdirty() {
 
-			// And count how many have rolls
-			var nrc int
-			for _, n := range ns {
-				if grid[n.y][n.x] {
-					nrc++
+		// Start to look for rolls to collect
+		//
+		// but only look through dirty rows
+		for _, i := range dc.getdirty() {
+			row := grid[i]
+
+			// We're checking this row so we can
+			// mark it as not dirty
+			dc.clean(i)
+
+			// Found dirty?
+			var found bool
+
+			// Look through the row's cells
+			for j, cell := range row {
+				// If it isn't toilet paper, skip it
+				if !cell {
+					continue
+				}
+
+				// Otherwise, get it's neighbors
+				p := point{x: j, y: i}
+				ns := neighbors(p, w, h)
+
+				// And count how many have rolls
+				var nrc int
+				for _, n := range ns {
+					if grid[n.y][n.x] {
+						nrc++
+					}
+				}
+
+				// If the neighbor-row-count is less
+				// than 4, it can be collected.
+				// - Mark it as collected
+				// - Increment the counter
+				// - Flag that we found one
+				if nrc < 4 {
+					total++
+					found = true
+					row[j] = false
 				}
 			}
 
-			// If the neighbor-row-count is less
-			// than 4, it can be collected
-			if nrc < 4 {
-				total++
+			// Did we collect a row?
+			//
+			// If so, mark this row and it's neighbors
+			// as dirty
+			if found {
+				dc.mark(i - 1)
+				dc.mark(i)
+				dc.mark(i + 1)
 			}
 		}
+
 	}
 
 	// Done!
@@ -135,4 +172,53 @@ func neighbors(p point, w, h int) []point {
 		ns = append(ns, n)
 	}
 	return ns
+}
+
+type dirtychecker struct {
+	rows []bool
+}
+
+func newdc(n int) *dirtychecker {
+	return &dirtychecker{
+		rows: make([]bool, n),
+	}
+}
+
+func (dc *dirtychecker) hasdirty() bool {
+	for _, r := range dc.rows {
+		if r {
+			return true
+		}
+	}
+	return false
+}
+
+func (dc *dirtychecker) mark(i int) {
+	if i < 0 || i >= len(dc.rows) {
+		return
+	}
+	dc.rows[i] = true
+}
+
+func (dc *dirtychecker) clean(i int) {
+	if i < 0 || i >= len(dc.rows) {
+		return
+	}
+	dc.rows[i] = false
+}
+
+func (dc *dirtychecker) setall(v bool) {
+	for i := range dc.rows {
+		dc.rows[i] = v
+	}
+}
+
+func (dc *dirtychecker) getdirty() []int {
+	var d []int
+	for i, r := range dc.rows {
+		if r {
+			d = append(d, i)
+		}
+	}
+	return d
 }
