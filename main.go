@@ -13,36 +13,102 @@ import (
 func main() {
 	// Read in the input ranges and
 	// ids to check
-	rs, ids := readInput()
+	rs, _ := readInput()
+	// fmt.Printf("Read in %d ranges\n", len(rs))
+	compacted := true
+	for compacted {
+		// fmt.Println("Compacting...")
+		rs, compacted = compact(rs)
+	}
 
-	// Track the count of good ids
+	// fmt.Printf("%+v\n", rs)
+
+	// Count up the id size
 	var count int
-
-	// Loop through the ids
-	for _, id := range ids {
-		// TODO: Add binary search to find start
-		for _, r := range rs {
-			if r.start > id {
-				break
-			}
-			if r.end < id {
-				continue
-			}
-			if r.isin(id) {
-				count++
-				break
-			}
-		}
+	for _, r := range rs {
+		count += r.size()
 	}
 
 	// Done!
-	fmt.Printf("Final count: %d\n", count)
+	fmt.Printf("There were %d unique ranges with a total id count of %d\n", len(rs), count)
+}
+
+func compact(rs []idrange) ([]idrange, bool) {
+	var compacted bool
+	var rs2 []idrange
+	for _, ra := range rs {
+		// Hit will track if we see one
+		// in the new list that matches
+		hit := -1
+
+		// Look for overlap
+		for j, rb := range rs2 {
+			// if ra.isbefore(rb) {
+			// 	continue
+			// }
+			// if ra.isafter(rb) {
+			// 	break
+			// }
+			if ra.overlaps(rb) {
+				hit = j
+				break
+			}
+		}
+
+		// Did it match one?
+		switch hit {
+		case -1:
+			rs2 = append(rs2, ra)
+		default:
+			rs2[hit] = rs2[hit].merge(ra)
+			compacted = true
+		}
+	}
+	return rs2, compacted
 }
 
 type idrange struct{ start, end int }
 
-func (r idrange) isin(n int) bool {
+func (r idrange) isbefore(o idrange) bool {
+	return r.end < o.start
+}
+
+func (r idrange) isafter(o idrange) bool {
+	return r.start > o.end
+}
+
+func (r idrange) contains(n int) bool {
 	return n >= r.start && n <= r.end
+}
+
+func (r idrange) size() int {
+	return r.end - r.start + 1
+}
+
+func (r idrange) overlaps(o idrange) bool {
+	return r.contains(o.start) ||
+		r.contains(o.end) ||
+		o.contains(r.start) ||
+		o.contains(r.end)
+
+}
+
+func (r idrange) merge(o idrange) idrange {
+	if !r.overlaps(o) {
+		panic(fmt.Sprintf("%+v and %+v don't overlap", r, o))
+	}
+	start := r.start
+	if o.start < start {
+		start = o.start
+	}
+	end := r.end
+	if o.end > end {
+		end = o.end
+	}
+	return idrange{
+		start: start,
+		end:   end,
+	}
 }
 
 func readInput() ([]idrange, []int) {
