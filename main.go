@@ -23,7 +23,11 @@ func main() {
 	wires := map[wire]bool{}
 
 	// Doo the looping
-	for it := range IterCount {
+	for it := 0; true; it++ {
+		if it%1_000 == 0 {
+			fmt.Printf("> Checkpoint n_groups=%4d iteration=%d\n", len(getGroupSizes(ps)), it)
+		}
+
 		// Create an array to track point distances
 		bestni, bestnj, bestnd := -1, -1, MaxInt
 		// neighbors := make([]struct{
@@ -87,8 +91,16 @@ func main() {
 
 		// Ensure one was found
 		if bestni == -1 {
-			panicf("No match found! it=%d bestni=%d bestnj=%d, bestnd=%d", it, bestni, bestnj, bestnd)
+			panicf("No match found! bestni=%d bestnj=%d, bestnd=%d", bestni, bestnj, bestnd)
 			continue
+		}
+
+		// Before we merge...check if these are
+		// the last two groups
+		pa, pb := ps[bestni], ps[bestnj]
+		if !hasMoreThanTwoGroups(ps) && pa.g != pb.g {
+			fmt.Printf("Connecting the last two groups! pa.x * pb.x = %d * %d = %d\n", pa.x, pb.x, pa.x*pb.x)
+			break
 		}
 
 		// Now that we've found the closest two
@@ -102,16 +114,13 @@ func main() {
 		wires[makeWire(ps[bestni].i, ps[bestnj].i)] = true
 	}
 
-	// Get the top 3 group sizes
-	top := getTop3GroupSizes(ps)
-	fmt.Printf("Top 3 group sizes: %+v\n", top)
-
-	// Multiply them together
-	total := 1
-	for _, s := range top {
-		total *= s
+	// Assume if we're here there are just two groups
+	gs := getGroupSizes(ps)
+	if len(gs) != 2 {
+		panicf("There should just be 2 groups but there aren't. Groups=%+v", gs)
 	}
-	fmt.Printf("Total: %d\n", total)
+	a, b := gs[0], gs[1]
+	fmt.Printf("Results: %d * %d = %d\n", a, b, a*b)
 }
 
 type wire struct{ a, b int }
@@ -121,6 +130,26 @@ func makeWire(a, b int) wire {
 		return wire{b, a}
 	}
 	return wire{a, b}
+}
+
+func hasMoreThanTwoGroups(ps []point) bool {
+	g1, g2 := ps[0].g, -1
+	for _, p := range ps {
+		// Alreay group 1 or group 2?
+		if p.g == g1 || p.g == g2 {
+			continue
+		}
+
+		// First sighting of group 2?
+		if g2 == -1 {
+			g2 = p.g
+			continue
+		}
+
+		// Otherwise...we found group 3
+		return true
+	}
+	return false
 }
 
 func getGroupSizes(ps []point) map[int]int {
