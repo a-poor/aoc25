@@ -4,120 +4,98 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"slices"
-	"strconv"
-	"unicode"
-)
-
-type operation rune
-
-const (
-	Mul operation = '*'
-	Add operation = '+'
-	Div operation = '/'
-	Sub operation = '-'
+	"strings"
 )
 
 func main() {
-	var total int
-	nrs, ors := readInput()
-
-	// Get the grid width and height
-	// for re-use
-	w, h := len(ors), len(nrs)
-
-	// Track the numbers in the current equation
-	var ns []int
-
-	// Loop across the grid right-to-left and
-	// top-to-bottom
-	for i := w - 1; i >= 0; i-- {
-		// Start a text number for the column
-		var nr []rune
-
-		// Loop top-to-bottom
-		for j := 0; j < h; j++ {
-			if r := nrs[j][i]; unicode.IsDigit(r) {
-				nr = append(nr, r)
-			}
-		}
-
-		// Empty column? Skip it
-		if len(nr) == 0 {
-			continue
-		}
-
-		// We got a number! Convert it and store it
-		sr := string(nr)
-		n, err := strconv.Atoi(sr)
-		if err != nil {
-			panic(fmt.Errorf("failed to parse %q (col=%d) as a number", sr, i))
-		}
-		ns = append(ns, n)
-
-		// Check if there's an operation in
-		// that column
-		if o := ors[i]; o == '+' || o == '*' {
-			total += equation{
-				ns: ns,
-				op: operation(o),
-			}.solve()
-			ns = make([]int, 0)
-		}
+	puzzle := readInput()
+	beamLine := makeStartLine(puzzle.w, puzzle.start)
+	var splitCount int
+	for _, s := range puzzle.splitters {
+		next, n := stepBeams(beamLine, s)
+		splitCount += n
+		beamLine = next
 	}
-
-	fmt.Printf("total = %d\n", total)
+	fmt.Printf("Split count: %d\n", splitCount)
 }
 
-type equation struct {
-	ns []int
-	op operation
+type puzzle struct {
+	w, h      int      // Grid size
+	start     int      // x-pos of start on row=1
+	splitters [][]bool // Beam splitters
 }
 
-func (e equation) solve() int {
-	n := e.ns[0]
-	for i := 1; i < len(e.ns); i++ {
-		switch e.op {
-		case Mul:
-			n *= e.ns[i]
-		case Add:
-			n += e.ns[i]
-		case Div:
-			n /= e.ns[i]
-		case Sub:
-			n -= e.ns[i]
-		default:
-			panic(fmt.Sprintf("Unknown rune %q", string(e.op)))
-		}
-	}
-	return n
-}
-
-func readInput() ([][]rune, []rune) {
+func readInput() puzzle {
 	s := bufio.NewScanner(os.Stdin)
 
-	var nrs [][]rune
-	var ors []rune
+	start := -1
+	var w int
+	var splitters [][]bool
 
 	for s.Scan() {
 		// Read the next line
 		line := s.Text()
 
-		// Handle different line cases
-		switch {
-		case isNumberLine(line):
-			nrs = append(nrs, []rune(line))
-
-		default:
-			ors = []rune(line)
+		// Is it the first line?
+		// (No splitters)
+		if start == -1 {
+			start = strings.IndexRune(line, 'S')
+			w = len([]rune(line))
+			continue
 		}
+
+		// Make an empty line
+		sl := make([]bool, w)
+		for i, r := range []rune(line) {
+			if r == '^' {
+				sl[i] = true
+			}
+		}
+		splitters = append(splitters, sl)
 	}
 	if err := s.Err(); err != nil {
 		panic(err)
 	}
-	return nrs, ors
+	return puzzle{
+		w:         w,
+		h:         len(splitters),
+		start:     start,
+		splitters: splitters,
+	}
 }
 
-func isNumberLine(ln string) bool {
-	return !slices.Contains([]rune(ln), '+')
+func makeStartLine(w, s int) []bool {
+	line := make([]bool, w)
+	line[s] = true
+	return line
+}
+
+func stepBeams(current, splits []bool) ([]bool, int) {
+	var count int
+	next := make([]bool, len(current))
+	for i, b := range current {
+		// No beam? No-op
+		if !b {
+			continue
+		}
+
+		// If there isn't a splitter, it just moves
+		// one down
+		if !splits[i] {
+			next[i] = true
+			continue
+		}
+
+		// Otherwise, we split
+		count++
+		// ...split left
+		if i > 0 {
+			next[i-1] = true
+		}
+		// ...split right
+		if i < len(next)-1 {
+			next[i+1] = true
+		}
+	}
+	return next, count
 }
