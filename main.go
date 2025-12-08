@@ -4,9 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"regexp"
+	"slices"
 	"strconv"
-	"strings"
 	"unicode"
 )
 
@@ -21,10 +20,52 @@ const (
 
 func main() {
 	var total int
-	eqs := readInput()
-	for _, eq := range eqs {
-		total += eq.solve()
+	nrs, ors := readInput()
+
+	// Get the grid width and height
+	// for re-use
+	w, h := len(ors), len(nrs)
+
+	// Track the numbers in the current equation
+	var ns []int
+
+	// Loop across the grid right-to-left and
+	// top-to-bottom
+	for i := w - 1; i >= 0; i-- {
+		// Start a text number for the column
+		var nr []rune
+
+		// Loop top-to-bottom
+		for j := 0; j < h; j++ {
+			if r := nrs[j][i]; unicode.IsDigit(r) {
+				nr = append(nr, r)
+			}
+		}
+
+		// Empty column? Skip it
+		if len(nr) == 0 {
+			continue
+		}
+
+		// We got a number! Convert it and store it
+		sr := string(nr)
+		n, err := strconv.Atoi(sr)
+		if err != nil {
+			panic(fmt.Errorf("failed to parse %q (col=%d) as a number", sr, i))
+		}
+		ns = append(ns, n)
+
+		// Check if there's an operation in
+		// that column
+		if o := ors[i]; o == '+' || o == '*' {
+			total += equation{
+				ns: ns,
+				op: operation(o),
+			}.solve()
+			ns = make([]int, 0)
+		}
 	}
+
 	fmt.Printf("total = %d\n", total)
 }
 
@@ -52,78 +93,31 @@ func (e equation) solve() int {
 	return n
 }
 
-func readInput() []equation {
-	var eqs []equation
+func readInput() ([][]rune, []rune) {
 	s := bufio.NewScanner(os.Stdin)
+
+	var nrs [][]rune
+	var ors []rune
+
 	for s.Scan() {
 		// Read the next line
 		line := s.Text()
 
 		// Handle different line cases
 		switch {
-		case len(eqs) == 0:
-			ns := parseNumberLine(line)
-			for _, n := range ns {
-				eqs = append(eqs, equation{
-					ns: []int{n},
-					op: operation(0),
-				})
-			}
-
 		case isNumberLine(line):
-			ns := parseNumberLine(line)
-			for i, n := range ns {
-				eqs[i].ns = append(eqs[i].ns, n)
-			}
+			nrs = append(nrs, []rune(line))
 
 		default:
-			os := parseOpLine(line)
-			for i, o := range os {
-				eqs[i].op = o
-			}
+			ors = []rune(line)
 		}
 	}
 	if err := s.Err(); err != nil {
 		panic(err)
 	}
-	return eqs
+	return nrs, ors
 }
 
 func isNumberLine(ln string) bool {
-	for _, r := range []rune(ln) {
-		if unicode.IsDigit(r) {
-			return true
-		}
-	}
-	return false
-}
-
-func parseNumberLine(ln string) []int {
-	ln = strings.TrimSpace(ln)
-	var ns []int
-	re := regexp.MustCompile(`^\d+`)
-	for len(ln) > 0 {
-		m := re.FindString(ln)
-		n, err := strconv.Atoi(m)
-		if err != nil {
-			panic(err)
-		}
-		ns = append(ns, n)
-		ln = ln[len(m):]
-		ln = strings.TrimSpace(ln)
-	}
-	return ns
-}
-
-func parseOpLine(ln string) []operation {
-	ln = strings.TrimSpace(ln)
-	var os []operation
-	re := regexp.MustCompile(`^[+\-*/]`)
-	for len(ln) > 0 {
-		m := re.FindString(ln)
-		os = append(os, operation(m[0]))
-		ln = ln[len(m):]
-		ln = strings.TrimSpace(ln)
-	}
-	return os
+	return !slices.Contains([]rune(ln), '+')
 }
