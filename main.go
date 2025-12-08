@@ -7,16 +7,13 @@ import (
 	"strings"
 )
 
+var mem = map[point]int{}
+
 func main() {
 	puzzle := readInput()
-	beamLine := makeStartLine(puzzle.w, puzzle.start)
-	var splitCount int
-	for _, s := range puzzle.splitters {
-		next, n := stepBeams(beamLine, s)
-		splitCount += n
-		beamLine = next
-	}
-	fmt.Printf("Split count: %d\n", splitCount)
+	count := countPaths(puzzle.splitters, point{y: 0, x: puzzle.start})
+	// fmt.Printf("mem=%+v\n", mem)
+	fmt.Printf("count: %d\n", count)
 }
 
 type puzzle struct {
@@ -64,38 +61,44 @@ func readInput() puzzle {
 	}
 }
 
-func makeStartLine(w, s int) []bool {
-	line := make([]bool, w)
-	line[s] = true
-	return line
+type point struct{ x, y int }
+
+func (p point) down() point {
+	return point{x: p.x, y: p.y + 1}
 }
 
-func stepBeams(current, splits []bool) ([]bool, int) {
-	var count int
-	next := make([]bool, len(current))
-	for i, b := range current {
-		// No beam? No-op
-		if !b {
-			continue
-		}
+func (p point) left() point {
+	return point{x: p.x - 1, y: p.y}
+}
 
-		// If there isn't a splitter, it just moves
-		// one down
-		if !splits[i] {
-			next[i] = true
-			continue
-		}
+func (p point) right() point {
+	return point{x: p.x + 1, y: p.y}
+}
 
-		// Otherwise, we split
-		count++
-		// ...split left
-		if i > 0 {
-			next[i-1] = true
-		}
-		// ...split right
-		if i < len(next)-1 {
-			next[i+1] = true
-		}
+func countPaths(grid [][]bool, p point) int {
+	if n, ok := mem[p]; ok {
+		return n
 	}
-	return next, count
+	n := _countPaths(grid, p)
+	mem[p] = n
+	return n
+}
+
+func _countPaths(grid [][]bool, p point) int {
+	// If we're on the last line, we're done
+	// (there aren no splitters on the last line)
+	if p.y >= len(grid)-1 {
+		return 1
+	}
+
+	// Otherwise we need to step the beam
+	p2 := p.down()
+
+	// If it didn't land on a splitter, continue
+	if !grid[p2.y][p2.x] {
+		return countPaths(grid, p2)
+	}
+
+	// Otherwise, split time
+	return countPaths(grid, p2.left()) + countPaths(grid, p2.right())
 }
