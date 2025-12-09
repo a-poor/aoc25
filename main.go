@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 )
@@ -18,252 +17,34 @@ const (
 func main() {
 	// Read in the points
 	ps := readInput()
+	fmt.Printf("Found %d input points\n", len(ps))
 
-	// Track the wires between points
-	wires := map[wire]bool{}
-
-	// Doo the looping
-	for it := 0; true; it++ {
-		if it%1_000 == 0 {
-			fmt.Printf("> Checkpoint n_groups=%4d iteration=%d\n", len(getGroupSizes(ps)), it)
-		}
-
-		// Create an array to track point distances
-		bestni, bestnj, bestnd := -1, -1, MaxInt
-		// neighbors := make([]struct{
-		// 	ni int // neighbor's index
-		// 	nd int // neighbor's distance
-		// }, len(ps))
-
-		for i, p1 := range ps {
-			// Init best point's index and max distance
-			bestj, bestd := -1, MaxInt
-
-			// Compare against other points
-			for j, p2 := range ps {
-				// If it's the same point, skip
-				if i == j {
-					continue
-				}
-
-				// // If they're in the same group, skip
-				// if p1.g == p2.g {
-				// 	continue
-				// }
-				//
-				// Actually...
-				//
-				// If they're already connected, skip
-				if wires[makeWire(p1.i, p2.i)] {
-					continue
-				}
-
-				// Otherwise, get the distance to the
-				// other point
-				d := p1.dist(p2)
-
-				// If it's greater than the current
-				// best, then skip
-				if d > bestd {
-					continue
-				}
-
-				// Otherwise, we have a new winner
+	var besti int
+	var bestj int
+	var bestArea int
+	for i, a := range ps {
+		for j, b := range ps {
+			ar := area(a, b)
+			if ar > bestArea {
+				besti = i
 				bestj = j
-				bestd = d
+				bestArea = ar
 			}
-
-			// Is it further than the previous best?
-			if bestd >= bestnd {
-				continue
-			}
-
-			// Is it valid
-			if bestj == -1 {
-				panicf("How did we get here?! %d -> %d == %d", i, bestj, bestd)
-			}
-
-			// Otherwise we have a new winner!
-			bestni = i
-			bestnj = bestj
-			bestnd = bestd
-		}
-
-		// Ensure one was found
-		if bestni == -1 {
-			panicf("No match found! bestni=%d bestnj=%d, bestnd=%d", bestni, bestnj, bestnd)
-			continue
-		}
-
-		// Before we merge...check if these are
-		// the last two groups
-		pa, pb := ps[bestni], ps[bestnj]
-		if !hasMoreThanTwoGroups(ps) && pa.g != pb.g {
-			fmt.Printf("Connecting the last two groups! pa.x * pb.x = %d * %d = %d\n", pa.x, pb.x, pa.x*pb.x)
-			break
-		}
-
-		// Now that we've found the closest two
-		// (not already grouped) points, we can
-		// merge those two groups
-		//
-		// fmt.Printf("Merging group %d and group %d\n", ps[bestni].g, ps[bestnj].g)
-		ps = groupPoints(ps, ps[bestni].g, ps[bestnj].g)
-
-		// And add a wire
-		wires[makeWire(ps[bestni].i, ps[bestnj].i)] = true
-	}
-
-	// Assume if we're here there are just two groups
-	gs := getGroupSizes(ps)
-	if len(gs) != 2 {
-		panicf("There should just be 2 groups but there aren't. Groups=%+v", gs)
-	}
-	a, b := gs[0], gs[1]
-	fmt.Printf("Results: %d * %d = %d\n", a, b, a*b)
-}
-
-type wire struct{ a, b int }
-
-func makeWire(a, b int) wire {
-	if a > b {
-		return wire{b, a}
-	}
-	return wire{a, b}
-}
-
-func hasMoreThanTwoGroups(ps []point) bool {
-	g1, g2 := ps[0].g, -1
-	for _, p := range ps {
-		// Alreay group 1 or group 2?
-		if p.g == g1 || p.g == g2 {
-			continue
-		}
-
-		// First sighting of group 2?
-		if g2 == -1 {
-			g2 = p.g
-			continue
-		}
-
-		// Otherwise...we found group 3
-		return true
-	}
-	return false
-}
-
-func getGroupSizes(ps []point) map[int]int {
-	sizes := make(map[int]int)
-	for _, p := range ps {
-		sizes[p.g] = sizes[p.g] + 1
-	}
-	return sizes
-}
-
-func getSortedGroupSizes(ps []point) []int {
-	groups := getGroupSizes(ps)
-	sizes := make([]int, 0, len(groups))
-	for _, n := range groups {
-		sizes = append(sizes, n)
-	}
-	slices.Sort(sizes)
-	slices.Reverse(sizes)
-	return sizes
-}
-
-func getTop3GroupSizes(ps []point) []int {
-	sortedSizes := getSortedGroupSizes(ps)
-	return sortedSizes[:3]
-}
-
-func groupPoints(ps []point, g1, g2 int) []point {
-	g3 := min(g1, g2)
-	for i, p := range ps {
-		if p.g == g1 || p.g == g2 {
-			ps[i] = p.withGroup(g3)
 		}
 	}
-	return ps
+	fmt.Printf("%s -> %s == %d\n", ps[besti], ps[bestj], bestArea)
 }
 
-type point struct{ i, g, x, y, z int }
+type point struct{ x, y int }
 
 func (p point) String() string {
-	return fmt.Sprintf(
-		"[id=%d|g=%d|p=(%d,%d,%d)]",
-		p.i, p.g,
-		p.x, p.y, p.z,
-	)
+	return fmt.Sprintf("(%d,%d)", p.x, p.y)
 }
 
-func (p point) withGroup(g int) point {
-	return point{
-		i: p.i,
-		g: g,
-		x: p.x,
-		y: p.y,
-		z: p.z,
-	}
-}
-
-func (p point) sub(o point) point {
-	return point{
-		i: -1,
-		g: -1,
-		x: p.x - o.x,
-		y: p.y - o.y,
-		z: p.z - o.z,
-	}
-}
-
-func (p point) mag() int {
-	return (p.x * p.x) + (p.y * p.y) + (p.z * p.z)
-}
-
-func (p point) dist(o point) int {
-	return o.sub(p).mag()
-}
-
-func readInput() []point {
-	s := bufio.NewScanner(os.Stdin)
-
-	var ps []point
-
-	for s.Scan() {
-		// Read the next line
-		line := s.Text()
-		sns := strings.Split(line, ",")
-		if len(sns) != 3 {
-			panicf("expected line %q to have three nums", line)
-		}
-		var p point
-		for i, s := range sns {
-			n, err := strconv.Atoi(s)
-			if err != nil {
-				panicf("failed")
-			}
-			switch i {
-			case 0:
-				p.x = n
-			case 1:
-				p.y = n
-			case 2:
-				p.z = n
-			}
-		}
-		p.i = len(ps) // ID is row #
-		p.g = p.i     // Point starts in solo group
-		ps = append(ps, p)
-
-	}
-	if err := s.Err(); err != nil {
-		panic(err)
-	}
-	return ps
-}
-
-func panicf(e string, a ...any) {
-	panic(fmt.Errorf(e, a...))
+func area(a, b point) int {
+	x := abs(a.x-b.x) + 1
+	y := abs(a.y-b.y) + 1
+	return x * y
 }
 
 func abs(n int) int {
@@ -271,4 +52,32 @@ func abs(n int) int {
 		return -n
 	}
 	return n
+}
+
+func readInput() []point {
+	var ps []point
+	s := bufio.NewScanner(os.Stdin)
+	for s.Scan() {
+		line := s.Text()
+		sns := strings.Split(line, ",")
+		if len(sns) != 2 {
+			panic(fmt.Errorf("expected line to have 2 parts %q", line))
+		}
+		ns := make([]int, 2)
+		for i, s := range sns {
+			n, err := strconv.Atoi(s)
+			if err != nil {
+				panic(err)
+			}
+			ns[i] = n
+		}
+		ps = append(ps, point{
+			x: ns[0],
+			y: ns[1],
+		})
+	}
+	if err := s.Err(); err != nil {
+		panic(err)
+	}
+	return ps
 }
