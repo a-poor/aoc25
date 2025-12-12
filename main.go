@@ -4,80 +4,121 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"strconv"
+	"slices"
 	"strings"
 )
 
 const (
-	IterCount = 1_000
-	// IterCount = 10
-	MaxInt = int((^uint(0) >> 1))
+	Start = "you"
+	End   = "out"
 )
 
 func main() {
-	// Read in the points
-	ps := readInput()
-	fmt.Printf("Found %d input points\n", len(ps))
+	// Read in the edges
+	es := readInput()
 
-	var besti int
-	var bestj int
-	var bestArea int
-	for i, a := range ps {
-		for j, b := range ps {
-			ar := area(a, b)
-			if ar > bestArea {
-				besti = i
-				bestj = j
-				bestArea = ar
-			}
+	// Sort the edges
+	slices.SortFunc(es, ordEdge)
+
+	// Get the count
+	count := countPathsOut(es, Start, nil)
+	fmt.Printf("Found %d paths from %q to %q\n", count, Start, End)
+}
+
+func countPathsOut(es []edge, pos string, seen []string) int {
+	// Are we there yet?
+	if pos == End {
+		return 1
+	}
+
+	// Otherwise look for next steps...
+	//
+	// Find the start
+	start, _ := slices.BinarySearchFunc(es, edge{from: pos}, func(a, b edge) int {
+		return strings.Compare(a.from, b.from)
+	})
+
+	// Doesn't exist?
+	if es[start].from != pos {
+		panic(fmt.Sprintf("point %q not in from list? (start=%d)", pos, start))
+	}
+
+	// Create a new "seen" slice that includes "pos"
+	seen2 := binaryInsert(seen, pos)
+
+	// Look through the list for all edges from pos
+	var count int
+	for i := start; i < len(es) && es[i].from == pos; i++ {
+		// Get the edge
+		e := es[i]
+
+		// Have we already been there?
+		//
+		// If so, it's a dead end
+		if binaryContains(seen, e.to) {
+			continue
 		}
+
+		// Otherwise, recurse
+		n := countPathsOut(es, e.to, seen2)
+		// (Optionally cache?)
+		count += n
 	}
-	fmt.Printf("%s -> %s == %d\n", ps[besti], ps[bestj], bestArea)
+	return count
 }
 
-type point struct{ x, y int }
-
-func (p point) String() string {
-	return fmt.Sprintf("(%d,%d)", p.x, p.y)
+func binaryContains(ps []string, p string) bool {
+	_, ok := slices.BinarySearch(ps, p)
+	return ok
 }
 
-func area(a, b point) int {
-	x := abs(a.x-b.x) + 1
-	y := abs(a.y-b.y) + 1
-	return x * y
+func binaryInsert(ps []string, p string) []string {
+	// Create a new slice with 1 extra capacity
+	ps2 := make([]string, len(ps), len(ps)+1)
+
+	// And copy over the existing values
+	copy(ps2, ps)
+
+	// Find the position of the new item
+	i, _ := slices.BinarySearch(ps2, p)
+
+	// And insert it
+	return slices.Insert(ps2, i, p)
 }
 
-func abs(n int) int {
-	if n < 0 {
-		return -n
+type edge struct{ from, to string }
+
+func (e edge) String() string {
+	return fmt.Sprintf("(%s->%s)", e.from, e.to)
+}
+
+func ordEdge(a, b edge) int {
+	if c := strings.Compare(a.from, b.from); c != 0 {
+		return c
 	}
-	return n
+	return strings.Compare(a.to, b.to)
 }
 
-func readInput() []point {
-	var ps []point
+func readInput() []edge {
+	var es []edge
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
 		line := s.Text()
-		sns := strings.Split(line, ",")
-		if len(sns) != 2 {
+		ps := strings.Split(line, ": ")
+		if len(ps) != 2 {
 			panic(fmt.Errorf("expected line to have 2 parts %q", line))
 		}
-		ns := make([]int, 2)
-		for i, s := range sns {
-			n, err := strconv.Atoi(s)
-			if err != nil {
-				panic(err)
-			}
-			ns[i] = n
+
+		f := ps[0]
+		for t := range strings.SplitSeq(ps[1], " ") {
+			es = append(es, edge{
+				from: f,
+				to:   t,
+			})
 		}
-		ps = append(ps, point{
-			x: ns[0],
-			y: ns[1],
-		})
 	}
 	if err := s.Err(); err != nil {
 		panic(err)
 	}
-	return ps
+	return es
 }
