@@ -9,9 +9,13 @@ import (
 )
 
 const (
-	Start = "you"
+	Start = "svr"
+	DAC   = "dac"
+	FFT   = "fft"
 	End   = "out"
 )
+
+var pathCache = map[string]int{}
 
 func main() {
 	// Read in the edges
@@ -21,14 +25,45 @@ func main() {
 	slices.SortFunc(es, ordEdge)
 
 	// Get the count
-	count := countPathsOut(es, Start, nil)
+	// count := countPathsOut(es, Start, End, nil)
+	startToDAC := countPathsOut(es, Start, DAC, nil)
+	startToFFT := countPathsOut(es, Start, FFT, nil)
+
+	dacToFFT := countPathsOut(es, DAC, FFT, []string{DAC})
+	fftToDAC := countPathsOut(es, FFT, DAC, []string{FFT})
+
+	dacToEnd := countPathsOut(es, DAC, End, []string{DAC, FFT})
+	fftToEnd := countPathsOut(es, FFT, End, []string{DAC, FFT})
+
+	var count int
+	count += startToDAC * dacToFFT * fftToEnd
+	count += startToFFT * fftToDAC * dacToEnd
+
 	fmt.Printf("Found %d paths from %q to %q\n", count, Start, End)
+	// fmt.Printf("pathCache: %+v\n", pathCache)
 }
 
-func countPathsOut(es []edge, pos string, seen []string) int {
+func countPathsOut(es []edge, pos, goal string, seen []string) int {
+	k := pos + ":" + goal
+	if n, ok := pathCache[k]; ok {
+		return n
+	}
+
+	n := _countPathsOut(es, pos, goal, seen)
+	pathCache[k] = n
+	return n
+}
+
+func _countPathsOut(es []edge, pos, goal string, seen []string) int {
 	// Are we there yet?
-	if pos == End {
+	if pos == goal {
 		return 1
+	}
+
+	// This "end" is not the goal but it *is*
+	// a dead end, so stop here...
+	if pos == End {
+		return 0
 	}
 
 	// Otherwise look for next steps...
@@ -60,9 +95,7 @@ func countPathsOut(es []edge, pos string, seen []string) int {
 		}
 
 		// Otherwise, recurse
-		n := countPathsOut(es, e.to, seen2)
-		// (Optionally cache?)
-		count += n
+		count += countPathsOut(es, e.to, goal, seen2)
 	}
 	return count
 }
